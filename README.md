@@ -12,9 +12,9 @@
     <br />
     <a href="#getting-started">Quick Start</a>
     ·
-    <a href="https://github.com/chaipinzheng/chat_app/issues/new?labels=bug">Report Bug</a>
+    <a href="https://github.com/chaipinzheng/socketio-chat/issues/new?labels=bug">Report Bug</a>
     ·
-    <a href="https://github.com/chaipinzheng/chat_app/issues/new?labels=enhancement">Request Feature</a>
+    <a href="https://github.com/chaipinzheng/socketio-chat/issues/new?labels=enhancement">Request Feature</a>
   </p>
 </div>
 
@@ -76,8 +76,8 @@ The frontend is intentionally lightweight — raw HTML, CSS, and JavaScript with
 
 1. Clone the repo
    ```bash
-   git clone https://github.com/chaipinzheng/chat_app
-   cd chat_app
+   git clone https://github.com/chaipinzheng/socketio-chat
+   cd socketio-chat
    ```
 
 2. Start all services with Docker Compose
@@ -168,6 +168,6 @@ Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information
 
 Chai Pin Zheng — [@chaipinzheng](https://github.com/chaipinzheng)
 
-Project Link: [https://github.com/chaipinzheng/chat_app](https://github.com/chaipinzheng/chat_app)
+Project Link: [https://github.com/chaipinzheng/socketio-chat](https://github.com/chaipinzheng/socketio-chat)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
