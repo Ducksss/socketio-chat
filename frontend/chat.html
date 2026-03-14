@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MetaLearnerChat</title>
+    <link rel="icon" type="image/x-icon" href="images/favicon.png" />
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./style_index.css" />
+    <style>
+      /* Include the left pane layout styles inside chat.html just like index.html */
+      /* Base Topbar */
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px;
+        background: var(--bg-app);
+        border-bottom: 1px solid var(--border-light);
+        height: 60px;
+        flex-shrink: 0;
+      }
+      
+      .topbar-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .brand-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: var(--border-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+      }
+
+      .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: #54656f;
+      }
+      .icon-btn-minimal {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #54656f;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        transition: background-color 0.2s;
+      }
+      .icon-btn-minimal:hover {
+        background-color: rgba(11,20,26,0.05);
+      }
+      .icon-btn-minimal svg {
+        width: 24px;
+        height: 24px;
+        fill: currentColor;
+      }
+
+      .groups-container {
+        flex: 1;
+        overflow-y: auto;
+        background: #ffffff;
+      }
+      .groups-container::-webkit-scrollbar { width: 6px; }
+      .groups-container::-webkit-scrollbar-track { background: transparent; }
+      .groups-container::-webkit-scrollbar-thumb { background: rgba(11,20,26,0.2); }
+
+      .search-bar-container {
+        padding: 8px 12px;
+        background: #ffffff;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .search-bar {
+        background: var(--bg-app);
+        border-radius: 8px;
+        padding: 8px 12px 8px 40px;
+        width: 100%;
+        border: none;
+        outline: none;
+        color: var(--text-primary);
+        font-family: inherit;
+        font-size: 0.9rem;
+        background-image: url('data:image/svg+xml;utf8,<svg fill="%2354656f" viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>');
+        background-repeat: no-repeat;
+        background-position: 10px center;
+      }
+
+      .group-list {
+        display: flex;
+        flex-direction: column;
+        list-style: none;
+        margin: 0; padding: 0;
+      }
+
+      .group-item {
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        cursor: pointer;
+        background: #ffffff;
+        transition: background-color 0.15s;
+        height: 72px;
+      }
+      .group-item:hover {
+        background-color: #f5f6f6;
+      }
+      .group-item.active {
+        background-color: var(--bg-app);
+      }
+
+      .group-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background-color: #dfe5e7;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: #ffffff;
+        flex-shrink: 0;
+        margin-right: 14px;
+        overflow: hidden;
+      }
+      
+      .group-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        height: 100%;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .group-item:last-child .group-info {
+        border-bottom: none;
+      }
+
+      .group-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 3px;
+      }
+      .group-name {
+        font-size: 1.05rem;
+        font-weight: 400; 
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .group-time {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        flex-shrink: 0;
+        margin-left: 8px;
+      }
+
+      .group-address {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-secondary);
+      }
+
+      /* Modal overlay */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(11,20,26,0.4);
+        justify-content: center;
+        align-items: center;
+      }
+      .modal-overlay.open { display: flex; }
+
+      .modal-box {
+        background: #ffffff;
+        border-radius: 3px;
+        box-shadow: 0 17px 50px 0 rgba(11,20,26,0.19), 0 12px 15px 0 rgba(11,20,26,0.24);
+        padding: 24px;
+        width: 100%;
+        max-width: 380px;
+        animation: scaleIn 0.2s cubic-bezier(0.1, 0.82, 0.25, 1) forwards;
+      }
+      @keyframes scaleIn {
+        from { transform: scale(0.9); opacity: 0; }
+        to   { transform: scale(1); opacity: 1; }
+      }
+      
+      .modal-title {
+        font-size: 1.2rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 20px;
+      }
+      .modal-footer {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+        justify-content: flex-end;
+      }
+      .btn-modal-cancel {
+        padding: 10px 24px;
+        background: transparent;
+        border: none;
+        color: var(--wa-green-dark);
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        text-transform: uppercase;
+        border-radius: 3px;
+        transition: background-color 0.2s;
+      }
+      .btn-modal-cancel:hover { background: rgba(0,168,132,0.05); }
+      .btn-modal-confirm {
+        padding: 10px 24px;
+        background: var(--wa-green);
+        border: none;
+        border-radius: 3px;
+        color: #fff;
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        text-transform: uppercase;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: background-color 0.2s;
+      }
+      .btn-modal-confirm:hover { background: var(--wa-green-dark); }
+    </style>
+  </head>
+  <body>
+    <!-- Entire App wrapped in double pane view -->
+    <div class="app-wrapper">
+      
+      <!-- LEFT PANE -->
+      <aside class="left-pane">
+        <header class="topbar">
+          <div class="topbar-brand">
+            <div class="brand-avatar">
+              <svg fill="currentColor" viewBox="0 0 24 24" width="24" height="24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+            </div>
+          </div>
+          
+          <div class="topbar-actions">
+            <button class="icon-btn-minimal" id="openJoinModal" title="Join Group">
+              <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+            </button>
+            <button class="icon-btn-minimal" id="openCreateModal" title="New Group">
+              <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            </button>
+            <button class="icon-btn-minimal" id="logoutBtn" title="Log Out">
+              <svg viewBox="0 0 24 24"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="search-bar-container">
+          <input type="text" class="search-bar" placeholder="Search or start new chat" disabled />
+        </div>
+
+        <div class="groups-container">
+          <ol class="group-list" id="user-groups"></ol>
+        </div>
+      </aside>
+
+      <!-- RIGHT PANE (Chat Container) -->
+      <main class="right-pane msger">
+        
+        <header class="msger-header">
+          <div class="header-group-avatar">
+            <svg fill="currentColor" viewBox="0 0 24 24" width="24" height="24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          </div>
+
+          <div class="header-group-info">
+              <div class="header-group-name" id="group_name_text"></div>
+              <div class="header-members" id="show_members"></div>
+          </div>
+          
+          <div class="header-actions">
+            <!-- Optional search icon -->
+            <button class="icon-btn-minimal" title="Search">
+              <svg viewBox="0 0 24 24" width="24" height="24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            </button>
+            <!-- Close Chat/Leave acts as menu here on Desktop view. On mobile this was "Back" -->
+            <button class="icon-btn-minimal" id="close-chat-desktop" onclick="window.location.href='http://127.0.0.1'" title="Close Chat">
+              <!-- X icon for closing pane -->
+              <svg viewBox="0 0 24 24" width="24" height="24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <section class="msger-chat"></section>
+
+        <form class="msger-inputarea">
+          <div style="color: var(--wa-icon); padding: 8px; cursor: pointer;">
+             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          </div>
+
+          <input
+            type="text"
+            class="msger-input"
+            placeholder="Type a message"
+          />
+
+          <button type="submit" class="msger-send-btn">Send</button>
+        </form>
+      </main>
+
+    </div><!-- /.app-wrapper -->
+
+    <div id="myPopup" class="popup">
+      <div class="popup-content">
+        <p>Edit message</p>
+        <form style="position: relative;">
+          <input type="text" id="edit_text_fill" />
+          <button type="button" id="closePopup">Cancel</button>
+          <button type="button" id="editButton">Save</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modals from index so that create/join logic works on chat page too -->
+    <!-- Create Group Modal -->
+    <div class="modal-overlay" id="createModal">
+      <div class="modal-box">
+        <div class="modal-title">Create new group</div>
+        <div class="form-group">
+          <label for="create_groupname">Group subject</label>
+          <input type="text" id="create_groupname" placeholder="E.g., Team Updates" />
+        </div>
+        <div class="form-group">
+          <label for="create_username">Group identifier (address)</label>
+          <input type="text" id="create_username" placeholder="@address" />
+        </div>
+        <div class="modal-footer">
+          <button class="btn-modal-cancel" id="closeCreateModal">Cancel</button>
+          <button class="btn-modal-confirm" id="create_group_btn">Create</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Join Group Modal -->
+    <div class="modal-overlay" id="joinModal">
+      <div class="modal-box">
+        <div class="modal-title">Join a group</div>
+        <div class="form-group">
+          <label for="username">Group identifier (address)</label>
+          <input type="text" id="username" placeholder="@address" />
+        </div>
+        <div class="modal-footer">
+          <button class="btn-modal-cancel" id="closeJoinModal">Cancel</button>
+          <button class="btn-modal-confirm" id="joinButton">Join</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const openCreate = document.getElementById('openCreateModal');
+      const closeCreate = document.getElementById('closeCreateModal');
+      const createModal = document.getElementById('createModal');
+      const openJoin = document.getElementById('openJoinModal');
+      const closeJoin = document.getElementById('closeJoinModal');
+      const joinModal = document.getElementById('joinModal');
+      const logoutBtn = document.getElementById('logoutBtn');
+
+      if (openCreate && createModal) {
+        openCreate.addEventListener('click', () => createModal.classList.add('open'));
+        closeCreate.addEventListener('click', () => createModal.classList.remove('open'));
+        createModal.addEventListener('click', (e) => { if(e.target === createModal) createModal.classList.remove('open'); });
+      }
+
+      if (openJoin && joinModal) {
+        openJoin.addEventListener('click', () => joinModal.classList.add('open'));
+        closeJoin.addEventListener('click', () => joinModal.classList.remove('open'));
+        joinModal.addEventListener('click', (e) => { if(e.target === joinModal) joinModal.classList.remove('open'); });
+      }
+
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+          if(typeof handleLogoutClick === 'function') handleLogoutClick();
+        });
+      }
+    </script>
+    <script src="group_list.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

@@ -1,0 +1,465 @@
+/* ===========================
+   MetaLearnerChat — Chat Page Styles
+   WhatsApp/Telegram Light Mode
+   =========================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+:root {
+  /* WhatsApp Light Theme Colors */
+  --bg-app: #f0f2f5;
+  --bg-chat: #efeae2;      /* The classic WA beige background */
+  --bg-header: #f0f2f5;
+  --bg-input-bar: #f0f2f5;
+  
+  /* Bubbles */
+  --bubble-left: #ffffff;
+  --bubble-right: #d9fdd3; /* Classic WA light green */
+  --bubble-shadow: 0 1px 0.5px rgba(11,20,26,.13);
+
+  /* Accents */
+  --wa-green: #00a884;
+  --wa-icon: #54656f;
+
+  /* Text Colors */
+  --text-primary: #111b21;
+  --text-secondary: #667781;
+  --text-meta: #667781;    /* timestamps */
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", Helvetica, Arial, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Chat shell (now perfectly fills the right pane) ── */
+.msger {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-chat);
+  position: relative;
+
+  /* Optional: WhatsApp background doodle SVG pattern could go here */
+  /* background-image: url('data:...'); */
+}
+
+/* ── Header ── */
+.msger-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 10px 16px;
+  background-color: var(--bg-header);
+  border-bottom: 1px solid rgba(11,20,26,.08);
+  height: 60px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.header-back {
+  display: flex;
+  align-items: center;
+  color: var(--wa-icon);
+  text-decoration: none;
+  border-radius: 50%;
+  padding: 8px;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+.header-back:hover { background-color: rgba(11,20,26,.05); }
+.header-back svg { fill: currentColor; }
+
+.header-group-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #dfe5e7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.header-group-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.header-group-name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 21px;
+}
+.header-members {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 20px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+.icon-btn-minimal {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--wa-icon);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+.icon-btn-minimal:hover { background-color: rgba(11,20,26,0.05); }
+.icon-btn-minimal svg { fill: currentColor; }
+
+/* ── Chat messages area ── */
+.msger-chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px clamp(12px, 7vw, 108px);
+  display: flex;
+  flex-direction: column;
+}
+.msger-chat::-webkit-scrollbar { width: 6px; }
+.msger-chat::-webkit-scrollbar-track { background: transparent; }
+.msger-chat::-webkit-scrollbar-thumb {
+  background: rgba(11,20,26,.2);
+}
+
+/* ── Message row ── */
+.msg {
+  display: flex;
+  align-items: flex-end; /* Usually WA doesn't show avatars for every row, but we will to preserve JS logic easily */
+  margin-bottom: 2px;
+}
+/* A message from the same sender right after another has less margin, different sender has more */
+.msg + .msg { margin-top: 6px; }
+
+/* The JS provides an image URL or class. We'll make it small and subtle, or hide it like WhatsApp mostly does. */
+.msg-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #dfe5e7;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+  margin-right: 8px;
+  margin-bottom: 4px;
+}
+
+/* Right side (My messages) don't need avatars in standard WA UI, so we hide it */
+.right-msg .msg-img { display: none; }
+/* Push right-msg to right side */
+.right-msg { justify-content: flex-end; }
+
+.msg-bubble {
+  max-width: min(68%, 760px);
+  padding: 6px 7px 8px 9px;
+  border-radius: 7.5px;
+  position: relative;
+  box-shadow: var(--bubble-shadow);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Left (Received) */
+.left-msg .msg-bubble {
+  background-color: var(--bubble-left);
+  border-top-left-radius: 0;
+}
+/* Right (Sent) */
+.right-msg .msg-bubble {
+  background-color: var(--bubble-right);
+  border-top-right-radius: 0;
+}
+
+/* The name tag on group messages */
+.msg-info-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #1fa851; /* Random colors per user in WA, we use a single green for simplicity */
+  margin-bottom: 2px;
+  line-height: 21px;
+}
+.right-msg .msg-info-name {
+  display: none; /* WA doesn't show your own name */
+}
+
+/* The actual text */
+.msg-text {
+  font-size: 0.95rem;
+  line-height: 1.38;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  word-wrap: break-word;
+}
+
+.msg-info {
+  display: flex;
+  flex-direction: column;
+}
+.msg-info > .msg-info-name {
+  display: block;
+  width: 100%;
+}
+.msg-info > .msg-info-time {
+  position: static;
+  align-self: flex-end;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  color: var(--text-meta);
+  line-height: 15px;
+  background: transparent;
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* The JS puts icons in .msg-info-time divs */
+.msg-info-time img {
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+  /* Make them look like flat greyscale icons */
+  filter: grayscale(100%) opacity(0.8);
+}
+.msg-info-time img:hover { opacity: 1; filter: grayscale(0%); }
+
+@media (max-width: 1024px) {
+  .msger-chat {
+    padding: 16px clamp(10px, 4vw, 30px);
+  }
+
+  .msg-bubble {
+    max-width: 78%;
+  }
+}
+
+@media (max-width: 600px) {
+  .msger-chat {
+    padding: 10px;
+  }
+
+  .msg {
+    margin-bottom: 4px;
+  }
+
+  .msg-bubble {
+    max-width: 90%;
+    padding: 6px 8px;
+  }
+
+  .msg-text {
+    font-size: 0.92rem;
+    line-height: 1.36;
+  }
+
+  .msg-info > .msg-info-time {
+    font-size: 0.64rem;
+    margin-top: 3px;
+  }
+}
+
+/* Edited / Deleted text */
+.edited-indication {
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--text-meta);
+  margin-left: 4px;
+}
+.deleted-indication {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+}
+.deleted-indication::before {
+  content: '🚫'; /* block icon indicating deleted */
+  margin-right: 4px;
+  font-style: normal;
+  font-size: 0.8rem;
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+/* Unread Messages Divider */
+/* The JS uses an alert alert-info div with id="unread", we style it completely differently */
+#unread {
+  text-align: center;
+  margin: 12px 0;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  
+  /* Reset bootstrap alert */
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-meta) !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  text-transform: uppercase;
+  padding: 0 !important;
+}
+#unread::before,
+#unread::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: var(--wa-green);
+  opacity: 0.3;
+  margin: 0 10px;
+}
+#unread::after { content: ''; } /* Already text inside */
+
+/* ── Input area ── */
+.msger-inputarea {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 10px 16px;
+  background-color: var(--bg-input-bar);
+  flex-shrink: 0;
+  /* No top border in WA generally, just relies on background contrast */
+}
+
+/* The input wrapper pretends to be the white pill */
+.msger-input {
+  flex: 1;
+  background-color: #ffffff;
+  border: none;
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 12px 18px;
+  min-height: 40px;
+  outline: none;
+  box-shadow: 0 1px 1px rgba(0,0,0,0.05); /* very subtle inset */
+}
+.msger-input::placeholder { color: var(--text-meta); }
+
+.msger-send-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: var(--wa-green);
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+  /* Convert "Send" text to an icon using background image, text indented out */
+  text-indent: -9999px;
+  background-image: url('data:image/svg+xml;utf8,<svg fill="%23ffffff" viewBox="0 0 24 24" width="24" height="24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: center left 14px; /* offset slighty because the icon tail is left */
+}
+.msger-send-btn:hover { background-color: var(--wa-green-dark); }
+
+
+/* ── Edit message modal (Popup) ── */
+.popup {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(11,20,26,0.5); /* WA dark backdrop */
+  justify-content: center;
+  align-items: center;
+}
+.popup.show { display: flex; }
+
+.popup-content {
+  background: #ffffff;
+  border-radius: 3px;
+  box-shadow: 0 17px 50px 0 rgba(11,20,26,0.19), 0 12px 15px 0 rgba(11,20,26,0.24);
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+}
+.popup-content p {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+.popup-content input[type="text"] {
+  width: 100%;
+  background: #ffffff;
+  border: none;
+  border-bottom: 2px solid var(--wa-green);
+  border-radius: 0;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 8px 4px;
+  outline: none;
+  margin-bottom: 24px;
+}
+/* Center buttons form */
+.popup-content form { display: flex; flex-direction: column; }
+.popup-content form button {
+  width: auto;
+  align-self: flex-end;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: background-color 0.2s;
+  margin-top: 0 !important; /* override old inline styles via specificity */
+}
+#editButton {
+  background-color: var(--wa-green);
+  color: #ffffff;
+  margin-left: 10px;
+}
+#editButton:hover { background-color: var(--wa-green-dark); }
+
+#closePopup {
+  background-color: transparent;
+  color: var(--wa-green-dark);
+  position: absolute; /* Place it left of the edit button */
+  right: 110px;
+  bottom: 24px;
+}
+#closePopup:hover { background-color: rgba(0,168,132,0.05); }
+
+/* specific override for inline styles left in chat.html */
+#edit_text_fill { width: 100% !important; border:none!important; border-bottom: 2px solid var(--wa-green)!important; border-radius: 0!important; }

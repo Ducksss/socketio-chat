@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MetaLearnerChat — Groups</title>
+    <meta name="description" content="Browse and join your MetaLearnerChat group conversations." />
+    <link rel="icon" type="image/x-icon" href="images/favicon.png" />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      /* ── Groups Page: Left Pane Layout ── */
+      
+      /* Base Topbar */
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px;
+        background: var(--bg-app);
+        border-bottom: 1px solid var(--border-light);
+        height: 60px;
+        flex-shrink: 0;
+      }
+      
+      .topbar-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      /* Avatar replacement for brand in list view */
+      .brand-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: var(--border-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+      }
+      .logo-text {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+
+      /* Icons in header */
+      .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: #54656f;
+      }
+      .icon-btn-minimal {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #54656f;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        transition: background-color 0.2s;
+      }
+      .icon-btn-minimal:hover {
+        background-color: rgba(11,20,26,0.05);
+      }
+      .icon-btn-minimal svg {
+        width: 24px;
+        height: 24px;
+        fill: currentColor;
+      }
+
+      /* Group list container */
+      .groups-container {
+        flex: 1;
+        overflow-y: auto;
+        background: #ffffff;
+      }
+      .groups-container::-webkit-scrollbar { width: 6px; }
+      .groups-container::-webkit-scrollbar-track { background: transparent; }
+      .groups-container::-webkit-scrollbar-thumb { background: rgba(11,20,26,0.2); }
+
+      /* Subheader (optional filter area) */
+      .search-bar-container {
+        padding: 8px 12px;
+        background: #ffffff;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .search-bar {
+        background: var(--bg-app);
+        border-radius: 8px;
+        padding: 8px 12px 8px 40px;
+        width: 100%;
+        border: none;
+        outline: none;
+        color: var(--text-primary);
+        font-family: inherit;
+        font-size: 0.9rem;
+        /* Simulated search icon via background */
+        background-image: url('data:image/svg+xml;utf8,<svg fill="%2354656f" viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>');
+        background-repeat: no-repeat;
+        background-position: 10px center;
+      }
+
+      .group-list {
+        display: flex;
+        flex-direction: column;
+        list-style: none;
+        margin: 0; padding: 0;
+      }
+
+      /* List Item */
+      .group-item {
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        cursor: pointer;
+        background: #ffffff;
+        transition: background-color 0.15s;
+        height: 72px;
+      }
+      .group-item:hover {
+        background-color: #f5f6f6;
+      }
+      .group-item.active {
+        background-color: var(--bg-app);
+      }
+
+      .group-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background-color: #dfe5e7;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: #ffffff;
+        flex-shrink: 0;
+        margin-right: 14px;
+        overflow: hidden;
+      }
+      
+      .group-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        height: 100%;
+        border-bottom: 1px solid var(--border-light);
+      }
+      
+      /* Target last item to remove bottom border - optional but clean */
+      .group-item:last-child .group-info {
+        border-bottom: none;
+      }
+
+      .group-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 3px;
+      }
+      .group-name {
+        font-size: 1.05rem;
+        font-weight: 400; /* WA uses normal weight for names */
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      /* Timestamps (we repurpose this for the @address in this app) */
+      .group-time {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        flex-shrink: 0;
+        margin-left: 8px;
+      }
+
+      .group-address {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-secondary);
+      }
+
+      /* Modal overlay (standard centered white box on dark backdrop) */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(11,20,26,0.4);
+        justify-content: center;
+        align-items: center;
+      }
+      .modal-overlay.open { display: flex; }
+
+      .modal-box {
+        background: #ffffff;
+        border-radius: 3px;
+        box-shadow: 0 17px 50px 0 rgba(11,20,26,0.19), 0 12px 15px 0 rgba(11,20,26,0.24);
+        padding: 24px;
+        width: 100%;
+        max-width: 380px;
+        animation: scaleIn 0.2s cubic-bezier(0.1, 0.82, 0.25, 1) forwards;
+      }
+      @keyframes scaleIn {
+        from { transform: scale(0.9); opacity: 0; }
+        to   { transform: scale(1); opacity: 1; }
+      }
+      
+      .modal-title {
+        font-size: 1.2rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 20px;
+      }
+      .modal-footer {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+        justify-content: flex-end;
+      }
+      /* Modal buttons */
+      .btn-modal-cancel {
+        padding: 10px 24px;
+        background: transparent;
+        border: none;
+        color: var(--wa-green-dark);
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        text-transform: uppercase;
+        border-radius: 3px;
+        transition: background-color 0.2s;
+      }
+      .btn-modal-cancel:hover { background: rgba(0,168,132,0.05); }
+      .btn-modal-confirm {
+        padding: 10px 24px;
+        background: var(--wa-green);
+        border: none;
+        border-radius: 3px;
+        color: #fff;
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        text-transform: uppercase;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: background-color 0.2s;
+      }
+      .btn-modal-confirm:hover { background: var(--wa-green-dark); }
+    </style>
+  </head>
+  <body>
+    <div class="app-wrapper">
+      
+      <!-- LEFT PANE: Group List -->
+      <aside class="left-pane">
+        <header class="topbar">
+          <div class="topbar-brand">
+            <div class="brand-avatar">
+              <svg fill="currentColor" viewBox="0 0 24 24" width="24" height="24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+            </div>
+          </div>
+          
+          <div class="topbar-actions">
+            <!-- "Join Group" Icon (Link) -->
+            <button class="icon-btn-minimal" id="openJoinModal" title="Join Group">
+              <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+            </button>
+            <!-- "New Group" Icon (Plus/Chat) -->
+            <button class="icon-btn-minimal" id="openCreateModal" title="New Group">
+              <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            </button>
+            <!-- Logout Menu Icon (Ellipsis vertical) -->
+            <button class="icon-btn-minimal" id="logoutBtn" title="Log Out">
+              <svg viewBox="0 0 24 24"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="search-bar-container">
+          <input type="text" class="search-bar" placeholder="Search or start new chat" disabled />
+        </div>
+
+        <div class="groups-container">
+          <ol class="group-list" id="user-groups"></ol>
+        </div>
+      </aside>
+
+      <!-- RIGHT PANE: Empty State for Desktop Home -->
+      <main class="right-pane empty-state-pane">
+        <svg width="240" height="240" viewBox="0 0 240 240" fill="none" style="opacity: 0.15;">
+           <!-- Large chat bubble outline indicating no chat selected -->
+           <path d="M120 200c44.183 0 80-35.817 80-80s-35.817-80-80-80-80 35.817-80 80c0 17.5 5.572 33.688 15.02 46.992L41.332 208l41.01-13.67A79.5 79.5 0 00120 200zM120 220C92.41 220 67.43 208.82 49 190.963L15 202l11-34.5C8.913 149.27 0 130.68 0 110C0 49.249 53.726 0 120 0s120 49.249 120 110-53.726 110-120 110z" fill="currentColor"/>
+        </svg>
+        <div class="empty-state-title">MetaLearnerChat</div>
+        <div class="empty-state-text">Select a group to start messaging.</div>
+      </main>
+
+    </div><!-- /.app-wrapper -->
+
+    <!-- Create Group Modal -->
+    <div class="modal-overlay" id="createModal">
+      <div class="modal-box">
+        <div class="modal-title">Create new group</div>
+        <div class="form-group">
+          <label for="create_groupname">Group subject</label>
+          <input type="text" id="create_groupname" placeholder="E.g., Team Updates" />
+        </div>
+        <div class="form-group">
+          <label for="create_username">Group identifier (address)</label>
+          <input type="text" id="create_username" placeholder="@address" />
+        </div>
+        <div class="modal-footer">
+          <button class="btn-modal-cancel" id="closeCreateModal">Cancel</button>
+          <button class="btn-modal-confirm" id="create_group_btn">Create</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Join Group Modal -->
+    <div class="modal-overlay" id="joinModal">
+      <div class="modal-box">
+        <div class="modal-title">Join a group</div>
+        <div class="form-group">
+          <label for="username">Group identifier (address)</label>
+          <input type="text" id="username" placeholder="@address" />
+        </div>
+        <div class="modal-footer">
+          <button class="btn-modal-cancel" id="closeJoinModal">Cancel</button>
+          <button class="btn-modal-confirm" id="joinButton">Join</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const openCreate = document.getElementById('openCreateModal');
+      const closeCreate = document.getElementById('closeCreateModal');
+      const createModal = document.getElementById('createModal');
+      const openJoin = document.getElementById('openJoinModal');
+      const closeJoin = document.getElementById('closeJoinModal');
+      const joinModal = document.getElementById('joinModal');
+      const logoutBtn = document.getElementById('logoutBtn');
+
+      openCreate.addEventListener('click', () => createModal.classList.add('open'));
+      closeCreate.addEventListener('click', () => createModal.classList.remove('open'));
+      createModal.addEventListener('click', (e) => { if(e.target === createModal) createModal.classList.remove('open'); });
+
+      openJoin.addEventListener('click', () => joinModal.classList.add('open'));
+      closeJoin.addEventListener('click', () => joinModal.classList.remove('open'));
+      joinModal.addEventListener('click', (e) => { if(e.target === joinModal) joinModal.classList.remove('open'); });
+
+      // Note: handleLogoutClick is defined in group_list.js
+      logoutBtn.addEventListener('click', () => {
+        if(typeof handleLogoutClick === 'function') handleLogoutClick();
+      });
+    </script>
+    <script src="group_list.js"></script>
+  </body>
+</html>
