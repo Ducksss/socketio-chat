@@ -24,6 +24,7 @@
 
 - [About The Project](#about-the-project)
   - [Architecture](#architecture)
+  - [Sequence Diagram](#sequence-diagram)
   - [Built With](#built-with)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
@@ -117,6 +118,44 @@ graph TB
 ```
 
 See the full breakdown in [ARCHITECTURE.md](ARCHITECTURE.md).
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as User (Browser)
+  participant N as Nginx
+  participant A as FastAPI
+  participant DB as PostgreSQL
+  participant M as Group Members
+
+  U->>N: POST /token (username, password)
+  N->>A: Forward auth request
+  A->>DB: Validate user credentials
+  DB-->>A: User record
+  A-->>N: JWT token
+  N-->>U: JWT token
+
+  U->>A: WebSocket connect (/receive-message?token=JWT)
+  A->>DB: Verify token and group membership
+  DB-->>A: Authorized
+  A-->>U: Connection accepted
+
+  U->>A: WS /send-message (group_id, text)
+  A->>DB: Insert message row
+  DB-->>A: message_id + timestamp
+
+  par Online members
+    A-->>M: Broadcast new message via WebSocket
+  and Offline members
+    A->>DB: Insert unread_message rows
+  end
+
+  U->>A: WS edit/delete event
+  A->>DB: Persist change in changes table
+  A-->>M: Broadcast change event
+```
 
 ### Built With
 
