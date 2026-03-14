@@ -23,11 +23,13 @@
 ## Table of Contents
 
 - [About The Project](#about-the-project)
+  - [Architecture](#architecture)
   - [Built With](#built-with)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
 - [Usage](#usage)
+  - [Demo](#demo)
 - [Roadmap](#roadmap)
 - [License](#license)
 - [Contact](#contact)
@@ -50,6 +52,71 @@ The frontend is intentionally lightweight — raw HTML, CSS, and JavaScript with
 - 🐳 One-command Docker Compose deployment
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### Architecture
+
+```mermaid
+graph TB
+  subgraph "Client Layer"
+    Browser[Web Browser]
+    ChatUI[Chat UI<br/>HTML/CSS/JavaScript]
+  end
+
+  subgraph "Web Server Layer"
+    Nginx[Nginx<br/>Port 80<br/>Static File Server]
+  end
+
+  subgraph "Application Layer"
+    FastAPI[FastAPI Backend<br/>Port 8000<br/>Uvicorn ASGI Server]
+        
+    subgraph "API Endpoints"
+      Auth[Authentication<br/>/token, /health]
+      UserAPI[User Management<br/>/user/*]
+      GroupAPI[Group Management<br/>/group/*]
+      MessageAPI[Message Operations<br/>/message/*]
+      WS[WebSocket Endpoints<br/>/send-message<br/>/receive-message<br/>/broadcast-changes]
+    end
+  end
+
+  subgraph "Data Layer"
+    PostgreSQL[(PostgreSQL<br/>Port 5432<br/>Database)]
+        
+    subgraph "Database Tables"
+      Users[Users Table]
+      Groups[Groups Table]
+      Members[Group Members Table]
+      Messages[Messages Table]
+      Unread[Unread Messages Table]
+      Changes[Changes Table]
+    end
+  end
+
+  Browser -->|HTTP/HTTPS| Nginx
+  Browser -->|WebSocket| FastAPI
+  Nginx -->|Proxy API Calls| FastAPI
+  ChatUI -.->|Renders in| Browser
+    
+  Auth --> PostgreSQL
+  UserAPI --> PostgreSQL
+  GroupAPI --> PostgreSQL
+  MessageAPI --> PostgreSQL
+  WS --> PostgreSQL
+    
+  PostgreSQL --> Users
+  PostgreSQL --> Groups
+  PostgreSQL --> Members
+  PostgreSQL --> Messages
+  PostgreSQL --> Unread
+  PostgreSQL --> Changes
+
+  style Browser fill:#e1f5ff
+  style Nginx fill:#90EE90
+  style FastAPI fill:#FFD700
+  style PostgreSQL fill:#4169E1,color:#fff
+  style WS fill:#FF6347,color:#fff
+```
+
+See the full breakdown in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ### Built With
 
@@ -94,6 +161,14 @@ That's it — Nginx, FastAPI, and PostgreSQL all start together automatically.
 ---
 
 ## Usage
+
+### Demo
+
+<div align="center">
+  <video src="readme_files/recording.mov" controls width="900"></video>
+</div>
+
+If the embedded player does not load on your platform, open the video directly: [Demo recording](readme_files/recording.mov).
 
 ### WebSocket Flow
 
