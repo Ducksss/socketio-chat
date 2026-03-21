@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import json
 
 from fastapi import Depends, WebSocket, WebSocketDisconnect
@@ -13,9 +14,8 @@ from chat.crud import (
 )
 from chat.database import get_db
 from chat.models import Message, User
+from chat.realtime import UnreadConnection, realtime
 from chat.utils.jwt import get_current_user
-
-websocket_connections = {}
 
 
 @app.websocket("/send-message")
@@ -59,7 +59,6 @@ async def send_messages_endpoint(
             user.username,
             group_id,
         )
-        user.websocket = websocket
         await websocket.accept()
         while True:
             try:
@@ -83,7 +82,7 @@ async def send_messages_endpoint(
 
 async def broadcast_message(group_id: int, message: Message, db) -> None:
     """
-    send message to online users and save unread message for other users
+    Persist unread rows and notify all app instances for this group.
     - group_id [int]
     - message [Message]
 
@@ -99,8 +98,7 @@ async def broadcast_message(group_id: int, message: Message, db) -> None:
                 user=member.user,
                 group_id=group_id,
             )
-            if member.user.websocket:
-                asyncio.create_task(member.user.websocket.send_text(message.text))
+        await realtime.publish_message(group_id)
 
 
 @app.websocket("/get-unread-messages")
@@ -134,19 +132,21 @@ async def send_unread_messages_endpoint(
     if not is_group_member:
         return await websocket.close(reason="You're not allowed", code=4403)
     if user:
-        if user.id in websocket_connections:
+        if realtime.get_connection(user.id):
             logger.error(
                 "User %s Has More Than 1 Websocket With Group id : %s",
                 user.username,
                 group_id,
             )
             return await websocket.close(reason="You're not allowed", code=4403)
-        websocket_connections[user.id] = websocket
         await websocket.accept()
+        realtime.register_connection(user.id, group_id, websocket)
         try:
             await send_unread_messages(websocket, user, group_id, db)
         except (WebSocketDisconnect, RuntimeError):
             pass
+        finally:
+            realtime.unregister_connection(user.id, websocket)
     else:
         return await websocket.close()
 
@@ -159,29 +159,59 @@ async def send_unread_messages(
 ):
     """send unread messages to client"""
     while True:
-        db.refresh(user)
-        all_unread_messages: models.UnreadMessage = user.unread_messages
-        unread_messages_group: list[models.UnreadMessage] = []
-        if all_unread_messages:
-            unread_messages_group = [
-                un_mes
-                for un_mes in all_unread_messages
-                if str(un_mes.group_id) == str(group_id)
-            ]
-            await send_messages_concurrently(websocket, unread_messages_group)
-            for message in all_unread_messages:
-                db.delete(message)
-            db.commit()
-        else:
-            try:
-                await asyncio.wait_for(websocket.receive(), timeout=0.7)
-                continue
-            except asyncio.TimeoutError:
-                continue
-            except (WebSocketDisconnect, RuntimeError):
-                if websocket_connections[user.id]:
-                    websocket_connections.pop(user.id)
-                break
+        unread_messages_group = await flush_unread_messages(
+            websocket=websocket,
+            user=user,
+            group_id=group_id,
+            db=db,
+        )
+        if unread_messages_group:
+            continue
+        connection = realtime.get_connection(user.id)
+        if not connection or connection.websocket is not websocket:
+            break
+        await wait_for_message_or_disconnect(connection)
+
+
+async def flush_unread_messages(
+    websocket: WebSocket,
+    user: User,
+    group_id: int,
+    db: Session,
+) -> list[models.UnreadMessage]:
+    db.refresh(user)
+    all_unread_messages = list(user.unread_messages or [])
+    unread_messages_group = [
+        unread_message
+        for unread_message in all_unread_messages
+        if unread_message.group_id == group_id
+    ]
+    if not unread_messages_group:
+        return []
+    await send_messages_concurrently(websocket, unread_messages_group)
+    for unread_message in unread_messages_group:
+        db.delete(unread_message)
+    db.commit()
+    return unread_messages_group
+
+
+async def wait_for_message_or_disconnect(connection: UnreadConnection) -> None:
+    message_task = asyncio.create_task(connection.message_event.wait())
+    disconnect_task = asyncio.create_task(connection.websocket.receive())
+    done, pending = await asyncio.wait(
+        {message_task, disconnect_task},
+        return_when=asyncio.FIRST_COMPLETED,
+    )
+    for task in pending:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+    if disconnect_task in done:
+        message = disconnect_task.result()
+        if message["type"] == "websocket.disconnect":
+            raise WebSocketDisconnect(message.get("code", 1000))
+    if message_task in done and connection.message_event.is_set():
+        connection.message_event.clear()
 
 
 async def broadcast_changes(
@@ -192,7 +222,7 @@ async def broadcast_changes(
     new_text: str | None = None,
 ) -> None:
     """
-    broadcast changes to all online users on that group
+    Broadcast changes to every app instance with listeners on that group.
     - group_id [int]
     - change_type [str]
     - message_id [int]
@@ -201,41 +231,12 @@ async def broadcast_changes(
     output:
     - None
     """
-    group = await get_group_by_id(db=db, group_id=group_id)
-    if group:
-        changed_value = {
-            "type": change_type,
-            "id": message_id,
-            "new_text": new_text,
-        }
-        online_users = set(websocket_connections.keys())
-        await asyncio.gather(
-            *[
-                send_change_to_user(
-                    member.user.id, changed_value, online_users=online_users
-                )
-                for member in group.members
-            ]
-        )
-
-
-async def send_change_to_user(
-    user_id: int, change_data: dict, online_users: set
-) -> None:
-    """
-    send changes for online users
-    - user_id [int]
-    - change_data [dict]
-    - online_users [set]
-
-    output:
-    - None
-    """
-    if user_id in online_users:
-        connection = websocket_connections[
-            user_id
-        ]  # TODO this thing send changes to all users and this isn't good
-        await connection.send_text(json.dumps(change_data))
+    changed_value = {
+        "type": change_type.value,
+        "id": message_id,
+        "new_text": new_text,
+    }
+    await realtime.publish_change(group_id=group_id, change_data=changed_value)
 
 
 async def send_messages_concurrently(

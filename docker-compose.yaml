@@ -12,6 +12,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  redis:
+    restart: unless-stopped
+    image: redis:7.2-alpine
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   # FrontEnd
   nginx:
     restart: unless-stopped
@@ -27,11 +35,15 @@ services:
     restart: unless-stopped
     depends_on:
       - db
+      - redis
     build:
       context: .
       dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://root:1234@db/postgres
+      REDIS_URL: redis://redis:6379/0
     command: sh -c "sleep 3s && uvicorn main:app --host 0.0.0.0 --port 8000"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://127.0.0.1:8000/health/" ]

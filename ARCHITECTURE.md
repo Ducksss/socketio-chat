@@ -2,7 +2,7 @@
 
 ## System Overview
 
-This is a real-time WebSocket-based chat application built with FastAPI backend, PostgreSQL database, and vanilla JavaScript frontend served by Nginx.
+This is a real-time WebSocket-based chat application built with a FastAPI backend, PostgreSQL database, Redis pub/sub for cross-instance fan-out, and a vanilla JavaScript frontend served by Nginx.
 
 ## Architecture Diagram
 
@@ -31,6 +31,7 @@ graph TB
 
     subgraph "Data Layer"
         PostgreSQL[(PostgreSQL<br/>Port 5432<br/>Database)]
+        Redis[(Redis<br/>Port 6379<br/>Pub/Sub)]
         
         subgraph "Database Tables"
             Users[Users Table]
@@ -52,6 +53,7 @@ graph TB
     GroupAPI --> PostgreSQL
     MessageAPI --> PostgreSQL
     WS --> PostgreSQL
+    WS --> Redis
     
     PostgreSQL --> Users
     PostgreSQL --> Groups
@@ -59,6 +61,7 @@ graph TB
     PostgreSQL --> Messages
     PostgreSQL --> Unread
     PostgreSQL --> Changes
+    Redis --> WS
 
     style Browser fill:#e1f5ff
     style Nginx fill:#90EE90
@@ -121,8 +124,9 @@ User → Nginx → FastAPI (/token) → JWT Token → User
 1. User connects via WebSocket with JWT token
 2. FastAPI validates token and group membership
 3. User sends message → FastAPI → PostgreSQL (Messages table)
-4. FastAPI broadcasts to all online group members via WebSocket
-5. FastAPI creates unread entries for offline users
+4. FastAPI creates unread entries in PostgreSQL
+5. FastAPI publishes a Redis event for the target group
+6. Every FastAPI replica wakes local WebSocket listeners for that group
 ```
 
 ### Message Operations
@@ -155,6 +159,7 @@ User → Nginx → FastAPI (/token) → JWT Token → User
 - **WebSocket Authorization**: Token validation on WebSocket connections
 - **Group Membership Validation**: Ensures users can only access authorized groups
 - **CORS**: Configured for secure cross-origin requests
+- **Distributed Fan-out**: Redis pub/sub keeps edit/delete and new-message delivery in sync across backend replicas
 
 ## Deployment Architecture
 
@@ -163,7 +168,9 @@ Docker Compose
 ├── nginx (chat_app-nginx-1)
 │   └── Volumes: ./frontend → /usr/share/nginx/html
 ├── app (chat_app-app-1)
-│   └── Depends on: db
+│   └── Depends on: db, redis
+├── redis (chat_app-redis-1)
+│   └── Pub/Sub channel for realtime fan-out
 └── db (chat_app-db-1)
     └── Health checks enabled
 ```
@@ -185,12 +192,12 @@ Docker Compose
 ## Scalability Considerations
 
 **Current Limitations**:
-- In-memory WebSocket connection storage (not distributed)
 - Single database instance
 - No caching layer
+- Group presence is still tracked per app instance, so cross-instance multi-session policies remain simple
 
 **Future Enhancements**:
-- Redis for distributed WebSocket connection tracking
+- Redis presence tracking for strict global single-session enforcement
 - Database replication for read scalability
 - Load balancer for multiple backend instances
 - Message queue for reliable message delivery

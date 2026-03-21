@@ -42,7 +42,6 @@ class User(Base):
     groups = relationship("GroupMember", back_populates="user")
     messages = relationship("Message", back_populates="sender")
     unread_messages = relationship("UnreadMessage", back_populates="user")
-    websocket = None
 
 
 class UnreadMessage(Base):
