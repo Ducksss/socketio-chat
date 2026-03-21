@@ -5,7 +5,7 @@
   <h1 align="center">💬 Chat App</h1>
 
   <p align="center">
-    A real-time WebSocket chat application built with FastAPI, PostgreSQL, and vanilla JavaScript.
+    A real-time WebSocket chat application built with FastAPI, PostgreSQL, Redis pub/sub, and vanilla JavaScript.
     <br />
     <a href="ARCHITECTURE.md"><strong>Explore the Architecture »</strong></a>
     <br />
@@ -39,9 +39,9 @@
 
 ## About The Project
 
-<img src="readme_files/chat_new.png" />
+<img src="readme_files/demo.png" />
 
-A real-time group chat application that lets users send and receive messages instantly without page refreshes. Built using WebSockets at the core, the app supports group creation, live message broadcasting, and inline edit/delete operations — all running as three coordinated Docker containers.
+A real-time group chat application that lets users send and receive messages instantly without page refreshes. Built using WebSockets at the core, the app supports group creation, live message broadcasting, inline edit/delete operations, and Redis-backed horizontal scaling across backend replicas.
 
 The frontend is intentionally lightweight — raw HTML, CSS, and JavaScript with Bootstrap — keeping things fast and dependency-free.
 
@@ -50,6 +50,7 @@ The frontend is intentionally lightweight — raw HTML, CSS, and JavaScript with
 - 🔒 JWT-based authentication & bcrypt password hashing
 - ⚡ Fully async Python backend (FastAPI + Uvicorn)
 - 📡 WebSocket connections for real-time updates (send, receive, edit, delete)
+- 🔁 Redis pub/sub for cross-instance message fan-out
 - 🐳 One-command Docker Compose deployment
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -75,12 +76,13 @@ graph TB
       UserAPI[User Management<br/>/user/*]
       GroupAPI[Group Management<br/>/group/*]
       MessageAPI[Message Operations<br/>/message/*]
-      WS[WebSocket Endpoints<br/>/send-message<br/>/receive-message<br/>/broadcast-changes]
+      WS[WebSocket Endpoints<br/>/send-message<br/>/get-unread-messages]
     end
   end
 
   subgraph "Data Layer"
     PostgreSQL[(PostgreSQL<br/>Port 5432<br/>Database)]
+    Redis[(Redis<br/>Port 6379<br/>Pub/Sub)]
         
     subgraph "Database Tables"
       Users[Users Table]
@@ -102,6 +104,7 @@ graph TB
   GroupAPI --> PostgreSQL
   MessageAPI --> PostgreSQL
   WS --> PostgreSQL
+  WS --> Redis
     
   PostgreSQL --> Users
   PostgreSQL --> Groups
@@ -109,6 +112,7 @@ graph TB
   PostgreSQL --> Messages
   PostgreSQL --> Unread
   PostgreSQL --> Changes
+  Redis --> WS
 
   style Browser fill:#e1f5ff
   style Nginx fill:#90EE90
@@ -126,35 +130,40 @@ sequenceDiagram
   autonumber
   participant U as User (Browser)
   participant N as Nginx
-  participant A as FastAPI
+  participant A1 as FastAPI Replica A
+  participant R as Redis
+  participant A2 as FastAPI Replica B
   participant DB as PostgreSQL
   participant M as Group Members
 
   U->>N: POST /token (username, password)
-  N->>A: Forward auth request
-  A->>DB: Validate user credentials
-  DB-->>A: User record
-  A-->>N: JWT token
+  N->>A1: Forward auth request
+  A1->>DB: Validate user credentials
+  DB-->>A1: User record
+  A1-->>N: JWT token
   N-->>U: JWT token
 
-  U->>A: WebSocket connect (/receive-message?token=JWT)
-  A->>DB: Verify token and group membership
-  DB-->>A: Authorized
-  A-->>U: Connection accepted
+  U->>A2: WebSocket connect (/get-unread-messages?token=JWT)
+  A2->>DB: Verify token and group membership
+  DB-->>A2: Authorized
+  A2-->>U: Connection accepted
 
-  U->>A: WS /send-message (group_id, text)
-  A->>DB: Insert message row
-  DB-->>A: message_id + timestamp
+  U->>A1: WS /send-message (group_id, text)
+  A1->>DB: Insert message row
+  A1->>DB: Insert unread_message rows
+  A1->>R: Publish group event
+  R-->>A1: Fan-out event
+  R-->>A2: Fan-out event
+  A2->>DB: Query unread messages for local listeners
+  DB-->>A2: Pending unread rows
 
-  par Online members
-    A-->>M: Broadcast new message via WebSocket
-  and Offline members
-    A->>DB: Insert unread_message rows
-  end
+  A2-->>M: Deliver message via WebSocket
 
-  U->>A: WS edit/delete event
-  A->>DB: Persist change in changes table
-  A-->>M: Broadcast change event
+  U->>A1: HTTP edit/delete request
+  A1->>DB: Persist change in changes table
+  A1->>R: Publish change event
+  R-->>A2: Fan-out change
+  A2-->>M: Broadcast change event
 ```
 
 ### Built With
@@ -166,7 +175,7 @@ sequenceDiagram
 | **Database** | PostgreSQL 16.2 |
 | **Web Server** | Nginx 1.25.4 |
 | **Auth** | JWT, Bcrypt |
-| **Infra** | Docker, Docker Compose |
+| **Infra** | Docker, Docker Compose, Redis |
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -193,7 +202,13 @@ sequenceDiagram
 
 3. Open your browser and navigate to [http://localhost](http://localhost)
 
-That's it — Nginx, FastAPI, and PostgreSQL all start together automatically.
+That's it — Nginx, FastAPI, PostgreSQL, and Redis all start together automatically.
+
+To run multiple backend replicas with the same Redis pub/sub bus:
+
+```bash
+docker compose up -d --build --scale app=3
+```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -209,31 +224,46 @@ That's it — Nginx, FastAPI, and PostgreSQL all start together automatically.
 
 If the embedded player does not load on your platform, open the video directly: [Demo recording](readme_files/recording.mov).
 
-### WebSocket Flow
+### Redis Pub/Sub Flow
 
-When a user joins a group, the app opens a WebSocket connection. Any message sent is broadcast in real time to all online members. Offline members receive unread counts on their next login.
+Redis pub/sub was added to remove the single-instance websocket bottleneck. Before this change, a message could only be pushed to users connected to the same FastAPI process that created it. Now every backend replica can receive the same group event and notify its own local websocket clients.
 
-Here's how change broadcasts are handled internally (shortened — see full code in [`websocket.py`](backend/chat/views/websocket.py)):
+The flow now works like this:
+
+1. A client sends a message to `/send-message` on one FastAPI replica.
+2. That replica stores the message in PostgreSQL and creates unread rows for the group members.
+3. The backend publishes a lightweight event to Redis for the target group.
+4. Every FastAPI replica subscribed to the Redis channel receives the event.
+5. Each replica wakes only the websocket listeners it owns for that group.
+6. Those listeners read unread rows from PostgreSQL and push the message to the browser.
+7. Edit and delete actions follow the same pattern, except the Redis payload contains the change details directly.
+
+Here is the core handoff from the websocket layer into Redis-aware fan-out:
 
 ```python
-async def broadcast_changes(
-    group_id: int,
-    message_id: int,
-    new_text: str | None = None,
-    change_type: models.ChangeType,
-    db: Session,
-) -> None:
-    ...
-    online_users = set(websocket_connections.keys())
-    await asyncio.gather(
-        *[
-            send_change_to_user(
-                member.user.id, changed_value, online_users=online_users
+async def broadcast_message(group_id: int, message: Message, db) -> None:
+    group = await get_group_by_id(db=db, group_id=group_id)
+    if group:
+        for member in group.members:
+            await create_unread_message_controller(
+                db=db,
+                message=message,
+                user=member.user,
+                group_id=group_id,
             )
-            for member in group.members
-        ]
-    )
+        await realtime.publish_message(group_id)
 ```
+
+And the Redis listener wakes matching websocket consumers on every app instance:
+
+```python
+def _wake_group(self, group_id: int) -> None:
+    for connection in self.connections.values():
+        if connection.group_id == group_id:
+            connection.message_event.set()
+```
+
+This keeps PostgreSQL as the durable source of truth for unread delivery, while Redis handles fast cross-instance notification.
 
 ### Screenshots
 
@@ -264,7 +294,8 @@ For the full architecture breakdown, see [ARCHITECTURE.md](ARCHITECTURE.md).
 - [ ] Improved frontend UI/UX
 - [ ] Photo and file sharing
 - [ ] Reply-to-message support
-- [ ] Redis caching layer for unread messages and session management
+- [ ] Redis presence tracking for stricter global session handling
+- [ ] Redis caching layer for unread-message lookups
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

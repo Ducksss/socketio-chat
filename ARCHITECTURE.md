@@ -25,7 +25,7 @@ graph TB
             UserAPI[User Management<br/>/user/*]
             GroupAPI[Group Management<br/>/group/*]
             MessageAPI[Message Operations<br/>/message/*]
-            WS[WebSocket Endpoints<br/>/send-message<br/>/receive-message<br/>/broadcast-changes]
+            WS[WebSocket Endpoints<br/>/send-message<br/>/get-unread-messages]
         end
     end
 
@@ -92,6 +92,7 @@ graph TB
   - WebSocket support for real-time messaging
   - JWT-based authentication
   - Async/await operations
+  - Redis pub/sub integration for horizontal scaling
 
 #### API Modules:
 - **Authentication** (`auth.py`): JWT token generation, health checks
@@ -111,6 +112,15 @@ graph TB
   - **Unread Messages**: Tracks unread messages per user
   - **Changes**: Tracks edit/delete operations on messages
 
+### 4. Redis Pub/Sub
+- **Technology**: Redis 7
+- **Port**: 6379 (internal)
+- **Purpose**: Broadcast lightweight realtime events between FastAPI replicas
+- **Channel Role**:
+  - Publish `message` events after unread rows are persisted
+  - Publish `change` events for edit/delete operations
+  - Wake only the local websocket listeners connected to the relevant group on each replica
+
 ## Data Flow
 
 ### User Registration & Authentication
@@ -127,12 +137,23 @@ User → Nginx → FastAPI (/token) → JWT Token → User
 4. FastAPI creates unread entries in PostgreSQL
 5. FastAPI publishes a Redis event for the target group
 6. Every FastAPI replica wakes local WebSocket listeners for that group
+7. Each local listener reads unread rows for its user/group and sends them to the browser
+```
+
+### Distributed Broadcast Flow
+```
+1. Replica A accepts the incoming message or edit/delete request
+2. Replica A writes the durable state to PostgreSQL
+3. Replica A publishes a compact event to Redis
+4. Redis forwards that event to all subscribed FastAPI replicas
+5. Each replica checks whether it owns websocket listeners for the target group
+6. If it does, it pushes the event or unread messages to those local clients
 ```
 
 ### Message Operations
 ```
 - Send: WebSocket /send-message
-- Receive: WebSocket /receive-message (real-time updates)
+- Receive: WebSocket /get-unread-messages (real-time updates)
 - Edit: Broadcast change event to all group members
 - Delete: Broadcast change event to all group members
 ```
@@ -150,7 +171,8 @@ User → Nginx → FastAPI (/token) → JWT Token → User
 - Real-time message sending
 - Real-time message receiving
 - Broadcast changes (edit/delete)
-- Connection management with user ID tracking
+- Connection management with per-instance user/group tracking
+- Redis-triggered wake-up signals for group listeners
 
 ## Security Features
 
@@ -177,14 +199,15 @@ Docker Compose
 
 ### Container Dependencies
 1. **Database** starts first with health checks
-2. **Backend** waits for database (3s delay + health check)
-3. **Nginx** starts after backend
+2. **Redis** starts for pub/sub fan-out
+3. **Backend** waits for database and connects to Redis on startup
+4. **Nginx** starts after backend
 
 ## Key Technical Decisions
 
 1. **Async Operations**: Uses Python async/await for non-blocking I/O
 2. **WebSocket for Real-time**: Enables instant message delivery without polling
-3. **Separate Frontend/Backend**: Decoupled architecture for scalability
+3. **Redis Pub/Sub for Fan-out**: Decouples realtime delivery from any single backend instance
 4. **Docker Compose**: Simplified deployment and development setup
 5. **PostgreSQL**: Relational database for complex queries and data integrity
 6. **JWT Tokens**: Stateless authentication for scalability
@@ -195,6 +218,7 @@ Docker Compose
 - Single database instance
 - No caching layer
 - Group presence is still tracked per app instance, so cross-instance multi-session policies remain simple
+- Redis is used for notification fan-out, not as the primary message store
 
 **Future Enhancements**:
 - Redis presence tracking for strict global single-session enforcement
@@ -215,7 +239,7 @@ Docker Compose
 | `/group/{group_id}` | GET | Get group details |
 | `/message/history` | GET | Get message history |
 | `/send-message` | WebSocket | Send real-time messages |
-| `/receive-message` | WebSocket | Receive real-time updates |
+| `/get-unread-messages` | WebSocket | Receive real-time updates |
 
 ## Database Schema
 
@@ -261,6 +285,7 @@ UnreadMessages
 - **Frontend**: HTML5, CSS3, JavaScript (Vanilla), Bootstrap
 - **Backend**: Python 3.12, FastAPI, SQLAlchemy, Uvicorn
 - **Database**: PostgreSQL 16.2
+- **Pub/Sub**: Redis 7
 - **Web Server**: Nginx 1.25.4
 - **Authentication**: JWT (JSON Web Tokens)
 - **Password Hashing**: Bcrypt
